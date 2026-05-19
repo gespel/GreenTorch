@@ -16,11 +16,14 @@ class GreenTorch(ContextDecorator):
     def __exit__(self, exc_type, exc, tb):
         self.logger.info(f"Exiting dynamic frequency part! final key={self.key}")
 
+    def optimize(self):
+        self.logger.info(f"Called energy optimizer")
+
 
 
 if __name__ == "__main__":
     x = 1
-    # simple usage: modify `key` inside the with-block
     with GreenTorch() as gt:
         gt.key = 7
         print("This is a test!")
+        gt.optimize()
