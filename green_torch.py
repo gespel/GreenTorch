@@ -10,14 +10,17 @@ class GreenTorch(ContextDecorator):
 
     def __enter__(self):
         self.logger.info("Entering dynamic frequency scaling part!")
-        self.logger.info(self.key)
+        self.logger.info(f"initial key={self.key}")
+        return self
 
     def __exit__(self, exc_type, exc, tb):
-        self.logger.info("Exiting dynamic frequency part!")
+        self.logger.info(f"Exiting dynamic frequency part! final key={self.key}")
 
 
 
 if __name__ == "__main__":
     x = 1
-    with GreenTorch():
-        print(f"This is a test!")
+    # simple usage: modify `key` inside the with-block
+    with GreenTorch() as gt:
+        gt.key = 7
+        print("This is a test!")
