@@ -6,7 +6,7 @@ from contextlib import ContextDecorator
 from termcolor import colored
 
 class GreenTorch(ContextDecorator):
-    def __init__(self, key=0, gpu_id="1002:73AF-1EAE:6905-0000:09:00.0"):
+    def __init__(self, key: float = 0, gpu_id: str = "1002:73AF-1EAE:6905-0000:09:00.0"):
         self.logger = logging.getLogger("GreenTorch")
         logging.basicConfig(level=logging.DEBUG, format=colored("%(asctime)s", "yellow") + "|" + colored("%(name)s", "green") + "|%(levelname)s: %(message)s")
         self.logger.info("GreenTorch initialized")
@@ -23,7 +23,7 @@ class GreenTorch(ContextDecorator):
     def __exit__(self, exc_type, exc, tb):
         self.logger.info(f"Exiting dynamic frequency part! final key={self.key}")
 
-    def calc_optimize_frequency(self, energy):
+    def calc_optimize_frequency(self, energy: float):
         pass
 
     def optimize(self):
