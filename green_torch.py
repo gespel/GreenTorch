@@ -52,8 +52,8 @@ class GreenTorch(ContextDecorator):
 
             return json.loads(response.decode())
         
-        except:
-            print("Error while connecting to LACT!")
+        except Exception as e:
+            print(f"Error while connecting to LACT: {e}")
             return None
 
     def set_gpu_max_frequency(self, freq: int) -> bool:
