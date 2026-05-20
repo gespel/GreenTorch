@@ -19,6 +19,55 @@ class GreenTorch(ContextDecorator):
     def optimize(self):
         self.logger.info(f"Called energy optimizer")
 
+    def lact_request(self, payload: dict) -> dict:
+        with socket.create_connection(("127.0.0.1", 12853)) as sock:
+            sock.sendall((json.dumps(payload) + "\n").encode())
+
+            response = sock.recv(4096)
+
+        return json.loads(response.decode())
+
+    def set_gpu_max_frequency(self, freq: int) -> bool:
+        gpu_id = "1002:73AF-1EAE:6905-0000:09:00.0"
+
+        response = lact_request({
+            "command": "set_clocks_value",
+            "args": {
+                "id": gpu_id,
+                "command": {
+                    "type": "max_core_clock",
+                    "value": freq
+                }
+            }
+        })
+        
+        if response["status"] != "ok":
+            print("set:", response)
+
+        confirm_response = lact_request({
+            "command": "confirm_pending_config",
+            "args": {
+                "command": "confirm"
+            }
+        })
+
+        if confirm_response["status"] != "ok":
+            print("confirm:", confirm_response)
+
+        return True
+
+    def get_power_usage(self) -> float:
+        response = lact_request({
+            "command": "device_stats",
+            "args": {
+                "id": "1002:73AF-1EAE:6905-0000:09:00.0"
+            }
+        })
+
+        if response["status"] != "ok":
+            print(response)
+        return response["data"]["power"]["average"]
+
 
 
 if __name__ == "__main__":
