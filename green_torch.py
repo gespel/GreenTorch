@@ -1,12 +1,19 @@
+import time
 import logging
+import socket
+import json
 from contextlib import ContextDecorator
+from termcolor import colored
 
 class GreenTorch(ContextDecorator):
-    def __init__(self, key=0):
+    def __init__(self, key=0, gpu_id="1002:73AF-1EAE:6905-0000:09:00.0"):
         self.logger = logging.getLogger("GreenTorch")
-        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s|%(name)s|%(levelname)s: %(message)s")
+        logging.basicConfig(level=logging.DEBUG, format=colored("%(asctime)s", "yellow") + "|" + colored("%(name)s", "green") + "|%(levelname)s: %(message)s")
         self.logger.info("GreenTorch initialized")
         self.key = key
+        self.gpu_id = gpu_id
+        self.last_timestamp = 0
+        self.last_timediff = 0
 
     def __enter__(self):
         self.logger.info("Entering dynamic frequency scaling part!")
@@ -16,24 +23,44 @@ class GreenTorch(ContextDecorator):
     def __exit__(self, exc_type, exc, tb):
         self.logger.info(f"Exiting dynamic frequency part! final key={self.key}")
 
+    def calc_optimize_frequency(self, energy):
+        pass
+
     def optimize(self):
         self.logger.info(f"Called energy optimizer")
 
+        if self.last_timestamp == 0:
+            self.last_timestamp = time.time()
+        
+        else:
+            time_diff = time.time() - self.last_timestamp
+            self.last_timediff = time_diff
+            self.logger.info(f"Time since last call {time_diff} s")
+
+            energy = self.get_power_usage() * time_diff
+
+            self.set_gpu_max_frequency(self.calc_optimize_frequency(energy))
+
+
+
     def lact_request(self, payload: dict) -> dict:
-        with socket.create_connection(("127.0.0.1", 12853)) as sock:
+        try:
+            sock = socket.create_connection(("127.0.0.1", 12853))
             sock.sendall((json.dumps(payload) + "\n").encode())
 
             response = sock.recv(4096)
 
-        return json.loads(response.decode())
+            return json.loads(response.decode())
+        
+        except:
+            print("Error while connecting to LACT!")
+            return None
 
     def set_gpu_max_frequency(self, freq: int) -> bool:
-        gpu_id = "1002:73AF-1EAE:6905-0000:09:00.0"
-
-        response = lact_request({
+        response = self.lact_request({
             "command": "set_clocks_value",
             "args": {
-                "id": gpu_id,
+                "id": self.gpu_id,
                 "command": {
                     "type": "max_core_clock",
                     "value": freq
@@ -41,10 +68,13 @@ class GreenTorch(ContextDecorator):
             }
         })
         
+        if response == None:
+            return False
+
         if response["status"] != "ok":
             print("set:", response)
 
-        confirm_response = lact_request({
+        confirm_response = self.lact_request({
             "command": "confirm_pending_config",
             "args": {
                 "command": "confirm"
@@ -57,12 +87,15 @@ class GreenTorch(ContextDecorator):
         return True
 
     def get_power_usage(self) -> float:
-        response = lact_request({
+        response = self.lact_request({
             "command": "device_stats",
             "args": {
-                "id": "1002:73AF-1EAE:6905-0000:09:00.0"
+                "id": self.gpu_id
             }
         })
+
+        if response == None:
+            return 0
 
         if response["status"] != "ok":
             print(response)
@@ -75,4 +108,6 @@ if __name__ == "__main__":
     with GreenTorch() as gt:
         gt.key = 7
         print("This is a test!")
+        gt.optimize()
+        time.sleep(3)
         gt.optimize()
