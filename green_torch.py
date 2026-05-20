@@ -56,7 +56,8 @@ class GreenTorch(ContextDecorator):
         if self.last_timestamp == 0:
             self.last_timestamp = time.time()
         else:
-            time_diff = time.time() - self.last_timestamp
+            now = time.time()
+            time_diff = now - self.last_timestamp
             self.last_timediff = time_diff
             self.logger.info(f"Time since last call {time_diff} s")
 
@@ -66,6 +67,7 @@ class GreenTorch(ContextDecorator):
             self.logger.info(f"Setting new GPU Frequency: {new_frequency}")
 
             self.set_gpu_max_frequency(new_frequency)
+            self.last_timestamp = now
 
     def lact_request(self, payload: dict) -> dict:
         try:
