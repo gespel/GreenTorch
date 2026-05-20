@@ -1,6 +1,7 @@
 import time
 import logging
 import socket
+import random
 import json
 from contextlib import ContextDecorator
 from termcolor import colored
@@ -14,6 +15,8 @@ class GreenTorch(ContextDecorator):
         self.gpu_id = gpu_id
         self.last_timestamp = 0
         self.last_timediff = 0
+        self.last_epsilon = 0
+        self.last_energy = 0
 
     def __enter__(self):
         self.logger.info("Entering dynamic frequency scaling part!")
@@ -23,15 +26,35 @@ class GreenTorch(ContextDecorator):
     def __exit__(self, exc_type, exc, tb):
         self.logger.info(f"Exiting dynamic frequency part! final key={self.key}")
 
-    def calc_optimize_frequency(self, energy: float):
-        pass
+    def calc_optimize_frequency(self, energy: float) -> float:
+        if self.last_epsilon == 0:
+            self.last_epsilon = self.key / energy
+        else:
+            epsilon = self.key / energy
+            if self.last_epsilon > epsilon:
+                self.logger.info(f"Last ε {self.last_epsilon} was {colored("BETTER", "red")} than current ε {epsilon}. {colored("CLOCKING DOWN", "green")}")
+
+                curr_freq = self.get_gpu_max_frequency()
+                
+                self.last_epsilon = epsilon
+                return curr_freq - 50
+
+            elif self.last_epsilon < epsilon:
+                self.logger.info(f"Last ε {self.last_epsilon} was {colored("WORSE", "green")} than current ε {epsilon}. {colored("CLOCKING UP", "red")}")
+
+                curr_freq = self.get_gpu_max_frequency()
+
+                self.last_epsilon = epsilon
+                return curr_freq + 50
+            else:
+                self.logger.info(f"Epsilon is equal at {epsilon}...")
+            
 
     def optimize(self):
         self.logger.info(f"Called energy optimizer")
 
         if self.last_timestamp == 0:
             self.last_timestamp = time.time()
-        
         else:
             time_diff = time.time() - self.last_timestamp
             self.last_timediff = time_diff
@@ -39,22 +62,39 @@ class GreenTorch(ContextDecorator):
 
             energy = self.get_power_usage() * time_diff
 
-            self.set_gpu_max_frequency(self.calc_optimize_frequency(energy))
+            new_frequency = self.calc_optimize_frequency(energy)
+            self.logger.info(f"Setting new GPU Frequency: {new_frequency}")
 
-
+            self.set_gpu_max_frequency(new_frequency)
 
     def lact_request(self, payload: dict) -> dict:
         try:
             sock = socket.create_connection(("127.0.0.1", 12853))
             sock.sendall((json.dumps(payload) + "\n").encode())
 
-            response = sock.recv(4096)
+            response = sock.recv(163840)
 
             return json.loads(response.decode())
         
         except Exception as e:
             print(f"Error while connecting to LACT: {e}")
             return None
+        
+    def get_gpu_max_frequency(self) -> float:
+        response = self.lact_request({
+            "command": "device_clocks_info",
+            "args": {
+                "id": self.gpu_id
+            }
+        })
+
+        if response == None:
+            return 0
+        
+        if response["status"] != "ok":
+            print(response)
+
+        return response["data"]["max_sclk"]
 
     def set_gpu_max_frequency(self, freq: int) -> bool:
         response = self.lact_request({
@@ -106,8 +146,8 @@ class GreenTorch(ContextDecorator):
 if __name__ == "__main__":
     x = 1
     with GreenTorch() as gt:
-        gt.key = 7
-        print("This is a test!")
-        gt.optimize()
-        time.sleep(3)
-        gt.optimize()
+        while True:
+            gt.key = random.randint(0, 10)
+            print(f"Key is {gt.key}")
+            time.sleep(1)
+            gt.optimize()
