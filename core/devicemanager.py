@@ -1,3 +1,6 @@
+import socket
+import json
+
 class DeviceManager:
     def __init__(self, gpu_id: str):
         self.gpu_id = gpu_id
@@ -8,6 +11,8 @@ class DeviceManager:
             sock.sendall((json.dumps(payload) + "\n").encode())
             
             response = sock.recv(163840)
+
+            #print(json.loads(response.decode()))
 
             return json.loads(response.decode())
 

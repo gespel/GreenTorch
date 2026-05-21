@@ -28,7 +28,7 @@ class GreenTorch(ContextDecorator):
         self.last_energy = 0
         self.devicemanager = DeviceManager(gpu_id)
 
-        self.devicemanager.set_gpu_max_frequency(2200)
+        self.devicemanager.set_gpu_max_frequency(2600)
 
     def __enter__(self):
         self.logger.info("Entering dynamic frequency scaling part!")
