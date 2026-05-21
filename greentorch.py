@@ -49,7 +49,7 @@ class GreenTorch(ContextDecorator):
                 curr_freq = self.devicemanager.get_gpu_max_frequency()
                 
                 self.last_epsilon = epsilon
-                return curr_freq - 20
+                return curr_freq - 100
 
             elif self.last_epsilon < epsilon:
                 self.logger.info(f"Last ε {self.last_epsilon} was {colored("WORSE", "green")} than current ε {epsilon}. {colored("CLOCKING UP", "red")}")
@@ -57,7 +57,7 @@ class GreenTorch(ContextDecorator):
                 curr_freq = self.devicemanager.get_gpu_max_frequency()
 
                 self.last_epsilon = epsilon
-                return curr_freq + 20
+                return curr_freq + 100
             else:
                 self.logger.info(f"Epsilon is equal at {epsilon}...")
                 return self.devicemanager.get_gpu_max_frequency()
@@ -72,10 +72,10 @@ class GreenTorch(ContextDecorator):
             now = time.time()
             time_diff = now - self.last_timestamp
             self.last_timediff = time_diff
-            curr_power = self.devicemanager.get_power_usage()
+            curr_power = self.devicemanager.get_power_value()
             self.logger.info(f"Measured power: {curr_power} W")
             energy = curr_power * time_diff
-            self.logger.info(f"Time since last call {time_diff} s. Energy used {energy} with key {self.key}")
+            self.logger.info(f"Time since last call {time_diff} s. Energy used {energy:0.4f} Joule with key {self.key:0.4f}: epsilon is {self.key / energy}")
 
             new_frequency = self.calc_optimize_frequency(energy)
             self.logger.info(f"Setting new GPU Frequency: {new_frequency}")
