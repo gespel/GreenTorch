@@ -250,10 +250,10 @@ def train_model(
                 avg_loss = total_loss / batch_idx
                 progress.set_postfix(loss=f"{loss.item():.4f}", avg=f"{avg_loss:.8f}")
 
-                if batch_idx % 500 == 0:
+                if batch_idx % 250 == 0:
                     time_now = time.time()
                     time_diff = time_now - start_time
-                    gt.key = 500 / time_diff
+                    gt.key = 250 / time_diff
                     gt.optimize()
                     start_time = time_now
 

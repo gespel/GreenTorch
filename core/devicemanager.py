@@ -2,6 +2,7 @@ import socket
 import json
 import time
 import multiprocessing
+from collections import deque
 
 class DeviceManager:
     def __init__(self, gpu_id: str):
@@ -10,18 +11,30 @@ class DeviceManager:
         self._power_lock = multiprocessing.Lock()
         self._power_stop_event = multiprocessing.Event()
         self._power_process = None
-        self.start_power_monitor()
+        # A too-large averaging window introduces minutes of lag and looks like
+        # "wrong" power values. Keep it short by default.
+        self.start_power_monitor(interval=0.2, max_samples=30)
 
     def lact_request(self, payload: dict) -> dict:
         try:
-            sock = socket.create_connection(("127.0.0.1", 12853))
-            sock.sendall((json.dumps(payload) + "\n").encode())
-            
-            response = sock.recv(163840)
+            with socket.create_connection(("127.0.0.1", 12853), timeout=2.0) as sock:
+                message = (json.dumps(payload) + "\n").encode()
+                sock.sendall(message)
 
-            #print(json.loads(response.decode()))
+                # LACT speaks line-delimited JSON; read until newline so we don't
+                # accidentally parse partial responses.
+                buffer = b""
+                while b"\n" not in buffer:
+                    chunk = sock.recv(65536)
+                    if not chunk:
+                        break
+                    buffer += chunk
 
-            return json.loads(response.decode())
+                line = buffer.split(b"\n", 1)[0].strip()
+                if not line:
+                    return None
+
+                return json.loads(line.decode())
 
         except Exception as e:
             print(f"Error while connecting to LACT: {e}")
@@ -82,24 +95,36 @@ class DeviceManager:
         })
 
         if response == None:
-            return 0
+            return None
 
         if response["status"] != "ok":
             print(response)
-        return response["data"]["power"]["average"]
+            return None
+
+        try:
+            return float(response["data"]["power"]["average"])
+        except Exception:
+            return None
 
     def power_monitor_process_handle(self, value, lock, stop_event, interval: float = 0.1, max_samples: int = 1000):
-        past_values = []
+        # Rolling average over last N samples (fast + low-latency).
+        past_values = deque(maxlen=max_samples)
+        running_sum = 0.0
         while not stop_event.is_set():
-            past_values.append(self.get_power_usage())
-            if len(past_values) > max_samples:
-                past_values.pop(0)
+            v = self.get_power_usage()
 
-            total = 0.0
-            for v in past_values:
-                total += v
+            # Filter obvious invalid reads.
+            if v is None or v <= 0:
+                time.sleep(interval)
+                continue
 
-            avg = total / len(past_values)
+            if len(past_values) == past_values.maxlen:
+                running_sum -= past_values[0]
+
+            past_values.append(v)
+            running_sum += v
+
+            avg = running_sum / max(1, len(past_values))
 
             with lock:
                 value.value = avg
@@ -128,5 +153,15 @@ class DeviceManager:
 
     def get_power_value(self) -> float:
         with self._power_lock:
-            return float(self._power_value.value)
+            value = float(self._power_value.value)
+
+        # Warm-up: the monitor process starts asynchronously and may still be at 0.
+        if value <= 0:
+            direct = self.get_power_usage()
+            if direct is not None and direct > 0:
+                with self._power_lock:
+                    self._power_value.value = float(direct)
+                return float(direct)
+
+        return value
             

@@ -26,6 +26,14 @@ class GreenTorch(ContextDecorator):
         self.last_timediff = 0
         self.last_epsilon = None
         self.last_energy = 0
+        self.last_freq = None
+
+        # Simple directional search state
+        self.direction = -1  # start by clocking down from initial frequency
+        self.step_mhz = 100
+        self.epsilon_ema = None
+        self.epsilon_alpha = 0.3 
+        self.epsilon_tolerance = 0.01  # 1% deadband to avoid direction-flapping
         self.devicemanager = DeviceManager(gpu_id)
 
         self.devicemanager.set_gpu_max_frequency(2600)
@@ -38,29 +46,64 @@ class GreenTorch(ContextDecorator):
     def __exit__(self, exc_type, exc, tb):
         self.logger.info(f"Exiting dynamic frequency part! final key={self.key}")
 
-    def calc_optimize_frequency(self, energy: float) -> float:
-        if self.last_epsilon == None:
-            self.last_epsilon = self.key / energy
+    def _clamp_frequency(self, freq: int) -> int:
+        return max(100, int(freq))
+
+    def calc_optimize_frequency(self, power_w: float) -> float:
+        """Simple directional optimizer for ε = key/power (higher is better)."""
+
+        curr_freq = self.devicemanager.get_gpu_max_frequency()
+        self.last_freq = curr_freq
+        if curr_freq <= 0:
+            self.logger.info("Could not read current GPU frequency; skipping adjustment.")
+            return curr_freq
+
+        if power_w <= 0:
+            self.logger.info("Power is non-positive; keeping current frequency.")
+            return curr_freq
+
+        epsilon_raw = self.key / power_w
+
+        if self.epsilon_ema is None:
+            epsilon = epsilon_raw
+            self.epsilon_ema = epsilon_raw
         else:
-            epsilon = self.key / energy
-            if self.last_epsilon > epsilon:
-                self.logger.info(f"Last ε {self.last_epsilon} was {colored("BETTER", "red")} than current ε {epsilon}. {colored("CLOCKING DOWN", "green")}")
+            self.epsilon_ema = (self.epsilon_alpha * epsilon_raw) + ((1.0 - self.epsilon_alpha) * self.epsilon_ema)
+            epsilon = self.epsilon_ema
 
-                curr_freq = self.devicemanager.get_gpu_max_frequency()
-                
-                self.last_epsilon = epsilon
-                return curr_freq - 100
+        if self.last_epsilon is None:
+            self.last_epsilon = epsilon
+            self.logger.info(
+                f"Baseline ε initialized to {epsilon} (raw {epsilon_raw}) at {curr_freq} MHz."
+            )
+            next_freq = curr_freq + (self.direction * self.step_mhz)
+            return self._clamp_frequency(next_freq)
 
-            elif self.last_epsilon < epsilon:
-                self.logger.info(f"Last ε {self.last_epsilon} was {colored("WORSE", "green")} than current ε {epsilon}. {colored("CLOCKING UP", "red")}")
+        # Relative-change deadband to avoid flapping on noise.
+        prev = self.last_epsilon
+        denom = max(abs(prev), 1e-12)
+        rel_change = (epsilon - prev) / denom
 
-                curr_freq = self.devicemanager.get_gpu_max_frequency()
+        if rel_change > self.epsilon_tolerance:
+            self.logger.info(
+                f"ε improved {prev} -> {epsilon} (raw {epsilon_raw}, Δ={rel_change:+.2%}). "
+                f"{colored('CONTINUE', 'green')} direction {self.direction:+d}"
+            )
+        elif rel_change < -self.epsilon_tolerance:
+            self.direction *= -1
+            self.logger.info(
+                f"ε worsened {prev} -> {epsilon} (raw {epsilon_raw}, Δ={rel_change:+.2%}). "
+                f"{colored('REVERSE', 'red')} direction to {self.direction:+d}"
+            )
+        else:
+            self.logger.info(
+                f"ε change within deadband {prev} -> {epsilon} (raw {epsilon_raw}, Δ={rel_change:+.2%}). "
+                f"{colored('HOLD', 'yellow')}"
+            )
 
-                self.last_epsilon = epsilon
-                return curr_freq + 100
-            else:
-                self.logger.info(f"Epsilon is equal at {epsilon}...")
-                return self.devicemanager.get_gpu_max_frequency()
+        self.last_epsilon = epsilon
+        next_freq = curr_freq + (self.direction * self.step_mhz)
+        return self._clamp_frequency(next_freq)
             
 
     def optimize(self):
@@ -74,13 +117,20 @@ class GreenTorch(ContextDecorator):
             self.last_timediff = time_diff
             curr_power = self.devicemanager.get_power_value()
             self.logger.info(f"Measured power: {curr_power} W")
-            energy = curr_power * time_diff
-            self.logger.info(f"Time since last call {time_diff} s. Energy used {energy:0.4f} Joule with key {self.key:0.4f}: epsilon is {self.key / energy}")
 
-            new_frequency = self.calc_optimize_frequency(energy)
-            self.logger.info(f"Setting new GPU Frequency: {new_frequency}")
+            # `key` is expected to be throughput (e.g. batches/s), so efficiency is key/power.
+            epsilon = (self.key / curr_power) if curr_power > 0 else 0.0
+            self.logger.info(
+                f"Time since last call {time_diff} s. Key {self.key:0.4f}: epsilon is {epsilon} (key/power)"
+            )
 
-            self.devicemanager.set_gpu_max_frequency(new_frequency)
+            new_frequency = self.calc_optimize_frequency(curr_power)
+
+            if self.last_freq is not None and int(new_frequency) == int(self.last_freq):
+                self.logger.info(f"Holding GPU Frequency: {new_frequency}")
+            else:
+                self.logger.info(f"Setting new GPU Frequency: {new_frequency}")
+                self.devicemanager.set_gpu_max_frequency(new_frequency)
             self.last_timestamp = now
 
     
