@@ -2,8 +2,8 @@
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 [project]
-name = "greentorch_stenh"
-version = "0.0.3"
+name = "greentorch"
+version = "0.0.1"
 authors = [
   { name="Sten Heimbrodt", email="sten.heimbrodt@hotmail.de" },
 ]
