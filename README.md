@@ -1,0 +1,2 @@
+# GreenTorch
+GreenTorch is a Python library for energy-efficient deep learning. It provides tools and techniques to optimize the energy consumption of deep learning models while maintaining their best performance.
