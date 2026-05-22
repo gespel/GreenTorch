@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Logo" width="400"/>
+  <img src="https://raw.githubusercontent.com/gespel/GreenTorch/main/assets/logo.png"width="400"/>
 </p>
 
 # GreenTorch
