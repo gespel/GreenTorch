@@ -4,6 +4,14 @@ import time
 import multiprocessing
 from collections import deque
 
+class DeviceBackend:
+    def __init__(self):
+        pass
+
+class LACTDeviceBackend(DeviceBackend):
+    def __init__(self):
+        self.super().__init__()
+
 class DeviceManager:
     def __init__(self, gpu_id: str):
         self.gpu_id = gpu_id
@@ -11,9 +19,7 @@ class DeviceManager:
         self._power_lock = multiprocessing.Lock()
         self._power_stop_event = multiprocessing.Event()
         self._power_process = None
-        # A too-large averaging window introduces minutes of lag and looks like
-        # "wrong" power values. Keep it short by default.
-        self.start_power_monitor(interval=0.2, max_samples=30)
+        self.start_power_monitor(interval=0.1, max_samples=100)
 
     def lact_request(self, payload: dict) -> dict:
         try:
@@ -21,8 +27,6 @@ class DeviceManager:
                 message = (json.dumps(payload) + "\n").encode()
                 sock.sendall(message)
 
-                # LACT speaks line-delimited JSON; read until newline so we don't
-                # accidentally parse partial responses.
                 buffer = b""
                 while b"\n" not in buffer:
                     chunk = sock.recv(65536)
@@ -107,18 +111,16 @@ class DeviceManager:
             return None
 
     def power_monitor_process_handle(self, value, lock, stop_event, interval: float = 0.1, max_samples: int = 1000):
-        # Rolling average over last N samples (fast + low-latency).
         past_values = deque(maxlen=max_samples)
         running_sum = 0.0
         while not stop_event.is_set():
             v = self.get_power_usage()
 
-            # Filter obvious invalid reads.
             if v is None or v <= 0:
                 time.sleep(interval)
                 continue
 
-            if len(past_values) == past_values.maxlen:
+            if len(past_values) >= past_values.maxlen:
                 running_sum -= past_values[0]
 
             past_values.append(v)
@@ -155,7 +157,6 @@ class DeviceManager:
         with self._power_lock:
             value = float(self._power_value.value)
 
-        # Warm-up: the monitor process starts asynchronously and may still be at 0.
         if value <= 0:
             direct = self.get_power_usage()
             if direct is not None and direct > 0:

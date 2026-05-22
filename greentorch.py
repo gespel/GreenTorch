@@ -18,7 +18,7 @@ from core.devicemanager import DeviceManager
 class GreenTorch(ContextDecorator):
     def __init__(self, key: float = 0, gpu_id: str = "1002:73AF-1EAE:6905-0000:09:00.0"):
         self.logger = logging.getLogger("GreenTorch")
-        logging.basicConfig(level=logging.DEBUG, format=colored("%(asctime)s", "yellow") + "|" + colored("%(name)s", "green") + "|%(levelname)s: %(message)s")
+        logging.basicConfig(level=logging.INFO, format=colored("%(asctime)s", "yellow") + "|" + colored("%(name)s", "green") + "|%(levelname)s: %(message)s")
         self.logger.info("GreenTorch initialized")
         self.key = key
         self.gpu_id = gpu_id
@@ -28,23 +28,22 @@ class GreenTorch(ContextDecorator):
         self.last_energy = 0
         self.last_freq = None
 
-        # Simple directional search state
-        self.direction = -1  # start by clocking down from initial frequency
-        self.step_mhz = 100
+        self.direction = -1 
+        self.step_mhz = 50
         self.epsilon_ema = None
         self.epsilon_alpha = 0.3 
-        self.epsilon_tolerance = 0.01  # 1% deadband to avoid direction-flapping
+        self.epsilon_tolerance = 0.005
         self.devicemanager = DeviceManager(gpu_id)
 
         self.devicemanager.set_gpu_max_frequency(2600)
 
     def __enter__(self):
-        self.logger.info("Entering dynamic frequency scaling part!")
-        self.logger.info(f"initial key={self.key}")
+        self.logger.debug("Entering dynamic frequency scaling part!")
+        self.logger.debug(f"initial key={self.key}")
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        self.logger.info(f"Exiting dynamic frequency part! final key={self.key}")
+        self.logger.debug(f"Exiting dynamic frequency part! final key={self.key}")
 
     def _clamp_frequency(self, freq: int) -> int:
         return max(100, int(freq))
@@ -73,32 +72,31 @@ class GreenTorch(ContextDecorator):
 
         if self.last_epsilon is None:
             self.last_epsilon = epsilon
-            self.logger.info(
-                f"Baseline ε initialized to {epsilon} (raw {epsilon_raw}) at {curr_freq} MHz."
+            self.logger.debug(
+                f"Baseline ε initialized to {epsilon:0.4f} (raw {epsilon_raw:0.4f}) at {curr_freq:0.4f} MHz."
             )
             next_freq = curr_freq + (self.direction * self.step_mhz)
             return self._clamp_frequency(next_freq)
 
-        # Relative-change deadband to avoid flapping on noise.
         prev = self.last_epsilon
-        denom = max(abs(prev), 1e-12)
-        rel_change = (epsilon - prev) / denom
+        #denom = max(abs(prev), 1e-12)
+        rel_change = (epsilon - prev) / prev
 
         if rel_change > self.epsilon_tolerance:
             self.logger.info(
-                f"ε improved {prev} -> {epsilon} (raw {epsilon_raw}, Δ={rel_change:+.2%}). "
+                f"ε improved {prev:0.4f} -> {epsilon:0.4f} (raw {epsilon_raw:0.4f}, Δ={rel_change:+.2%}). "
                 f"{colored('CONTINUE', 'green')} direction {self.direction:+d}"
             )
         elif rel_change < -self.epsilon_tolerance:
             self.direction *= -1
             self.logger.info(
-                f"ε worsened {prev} -> {epsilon} (raw {epsilon_raw}, Δ={rel_change:+.2%}). "
+                f"ε worsened {prev:0.4f} -> {epsilon:0.4f} (raw {epsilon_raw:0.4f}, Δ={rel_change:+.2%}). "
                 f"{colored('REVERSE', 'red')} direction to {self.direction:+d}"
             )
         else:
             self.logger.info(
-                f"ε change within deadband {prev} -> {epsilon} (raw {epsilon_raw}, Δ={rel_change:+.2%}). "
-                f"{colored('HOLD', 'yellow')}"
+                f"ε change within deadband {prev:0.4f} -> {epsilon:0.4f} (raw {epsilon_raw:0.4f}, Δ={rel_change:+.2%}). "
+                f"{colored('HOLD', 'yellow')} direction to {self.direction:+d}"
             )
 
         self.last_epsilon = epsilon
@@ -107,8 +105,7 @@ class GreenTorch(ContextDecorator):
             
 
     def optimize(self):
-        self.logger.info(f"Called energy optimizer")
-
+        self.logger.debug(f"Called energy optimizer")
         if self.last_timestamp == 0:
             self.last_timestamp = time.time()
         else:
@@ -118,11 +115,8 @@ class GreenTorch(ContextDecorator):
             curr_power = self.devicemanager.get_power_value()
             self.logger.info(f"Measured power: {curr_power} W")
 
-            # `key` is expected to be throughput (e.g. batches/s), so efficiency is key/power.
             epsilon = (self.key / curr_power) if curr_power > 0 else 0.0
-            self.logger.info(
-                f"Time since last call {time_diff} s. Key {self.key:0.4f}: epsilon is {epsilon} (key/power)"
-            )
+            self.logger.debug(f"Time since last call {time_diff} s. Key {self.key:0.4f}: epsilon is {epsilon} (key/power)")
 
             new_frequency = self.calc_optimize_frequency(curr_power)
 
