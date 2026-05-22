@@ -79,8 +79,11 @@ class GreenTorch(ContextDecorator):
             return self._clamp_frequency(next_freq)
 
         prev = self.last_epsilon
-        #denom = max(abs(prev), 1e-12)
-        rel_change = (epsilon - prev) / prev
+
+        if prev == 0:
+            prev = 1e-12
+
+        rel_change = (epsilon - prev) / abs(prev)
 
         if rel_change > self.epsilon_tolerance:
             self.logger.info(
