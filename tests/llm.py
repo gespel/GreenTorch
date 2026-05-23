@@ -3,7 +3,9 @@ import logging
 import socket
 import random
 import json
+import sys
 from contextlib import ContextDecorator
+from pathlib import Path
 from termcolor import colored
 import torch
 import torch.nn as nn
@@ -12,6 +14,14 @@ import tqdm
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import requests
+
+
+# Allow running this file via `python -m tests.llm` without installing the package.
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_SRC_DIR = _PROJECT_ROOT / "src"
+if _SRC_DIR.exists() and str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
+
 from greentorch import GreenTorch
 
 
@@ -250,7 +260,7 @@ def train_model(
                 avg_loss = total_loss / batch_idx
                 progress.set_postfix(loss=f"{loss.item():.4f}", avg=f"{avg_loss:.8f}")
 
-                if batch_idx % 250 == 0:
+                if batch_idx % 50 == 0:
                     time_now = time.time()
                     time_diff = time_now - start_time
                     gt.key = 250 / time_diff
