@@ -13,7 +13,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import requests
 from .core.devicemanager import DeviceManager
-import optimizer
+from . import optimizer
 
 
 class GreenTorch(ContextDecorator):
