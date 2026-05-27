@@ -1,6 +1,6 @@
 [build-system]
-requires = ["maturin>=1.13,<2.0"]
-build-backend = "maturin"
+requires = ["hatchling>=1.26", "maturin>=1.13,<2.0"]
+build-backend = "hatchling.build"
 [project]
 name = "greentorch"
 version = "0.0.4"
@@ -21,7 +21,8 @@ license-files = ["LICEN[CS]E*"]
 Homepage = "https://github.com/gespel/GreenTorch"
 Issues = "https://github.com/gespel/GreenTorch/issues"
 
-[tool.maturin]
-python-source = "src"
-manifest-path = "src/rust_core/Cargo.toml"
-module-name = "greentorch.rust_core"
+[tool.hatch.build.targets.wheel]
+packages = ["src/greentorch"]
+
+[tool.hatch.build.hooks.custom]
+path = "build_crates.py"

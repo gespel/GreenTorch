@@ -13,7 +13,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import requests
 from .core.devicemanager import DeviceManager
-import greentorch.rust_core as rust_core
+import optimizer
 
 
 class GreenTorch(ContextDecorator):
@@ -30,6 +30,8 @@ class GreenTorch(ContextDecorator):
 
         for gpu_id in self.gpu_ids:
             self.logger.info(f"Monitoring GPU {gpu_id} with initial frequency {self.devicemanager.gpu_devices[gpu_id]['backend'].get_gpu_max_frequency()} MHz")
+
+        self.logger.info(f"{optimizer.sum_as_string(1, 2)}")
 
     def __enter__(self):
         self.logger.debug("Entering dynamic frequency scaling part!")
