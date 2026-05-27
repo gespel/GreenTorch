@@ -14,14 +14,6 @@ import tqdm
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import requests
-
-
-# Allow running this file via `python -m tests.llm` without installing the package.
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_SRC_DIR = _PROJECT_ROOT / "src"
-if _SRC_DIR.exists() and str(_SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(_SRC_DIR))
-
 from greentorch import GreenTorch
 
 
