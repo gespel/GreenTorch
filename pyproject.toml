@@ -3,7 +3,7 @@ requires = ["hatchling>=1.26", "maturin>=1.13,<2.0"]
 build-backend = "hatchling.build"
 [project]
 name = "greentorch"
-version = "0.0.4"
+version = "0.0.5"
 authors = [
   { name="Sten Heimbrodt", email="sten.heimbrodt@hotmail.de" },
 ]
