@@ -37,8 +37,8 @@ class DeviceManager:
             self.start_power_monitor(gpu_id)
 
 
-    def power_monitor_process_handle(self, gpu_id: str, value, lock, stop_event, interval: float = 0.1, max_samples: int = 1000):
-        past_values = deque(maxlen=max_samples)
+    def power_monitor_process_handle(self, gpu_id: str, value, lock, stop_event, interval: float = 0.1, max_samples: int = 100):
+        past_values = []
         running_sum = 0.0
         while not stop_event.is_set():
             v = self.gpu_devices[gpu_id]["backend"].get_power_usage()
@@ -47,20 +47,23 @@ class DeviceManager:
                 time.sleep(interval)
                 continue
 
-            if len(past_values) >= past_values.maxlen:
+            if len(past_values) >= max_samples:
                 running_sum -= past_values[0]
+                past_values.pop(0)
 
             past_values.append(v)
             running_sum += v
 
             avg = running_sum / max(1, len(past_values))
 
+            #print(f"current: {v} avg: {avg} pastvalues.len: {len(past_values)}")
+
             with lock:
                 value.value = avg
 
             time.sleep(interval)
 
-    def start_power_monitor(self, gpu_id: str, interval: float = 0.1, max_samples: int = 3000) -> None:
+    def start_power_monitor(self, gpu_id: str, interval: float = 0.01, max_samples: int = 100) -> None:
         self.gpu_devices[gpu_id]["power_stop_event"].clear()
         self.gpu_devices[gpu_id]["power_process"] = self._mp_ctx.Process(
             target=self.power_monitor_process_handle,

@@ -171,7 +171,7 @@ class SmallLLM(nn.Module):
         return logits
 
 def train_model(
-    batch_size: int = 128,
+    batch_size: int = 32,
     seq_len: int = 256,
     d_model: int = 256,
     num_heads: int = 4,
