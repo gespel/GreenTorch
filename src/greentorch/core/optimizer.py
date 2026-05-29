@@ -14,7 +14,7 @@ class SimpleDirectionalOptimizer(Optimizer):
         super().__init__(logger)
         self.epsilon_ema = 0
         self.epsilon_alpha = 0.3
-        self.last_epsilon = 0
+        self.last_epsilon = None
         self.direction = -1
         self.epsilon_tolerance = 0.005
         self.step_mhz = 50
@@ -41,7 +41,7 @@ class SimpleDirectionalOptimizer(Optimizer):
         if self.last_epsilon is None:
             self.last_epsilon = epsilon
             self.logger.debug(
-                f"Baseline ε initialized to {epsilon:0.4f} (raw {epsilon_raw:0.4f}) at {curr_freq:0.4f} MHz."
+                f"Baseline ε initialized to {epsilon:0.4f} (raw {epsilon_raw:0.4f}) at {curr_frequency:0.4f} MHz."
             )
             next_freq = curr_frequency + (self.direction * self.step_mhz)
             return next_freq
