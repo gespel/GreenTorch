@@ -256,7 +256,8 @@ def train_model(
                     time_now = time.time()
                     time_diff = time_now - start_time
                     gt.key = 250 / time_diff
-                    gt.optimize()
+                    #gt.optimize()
+                    gt.profile()
                     start_time = time_now
 
 if __name__ == "__main__":
