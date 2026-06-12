@@ -225,7 +225,7 @@ def train_model(
     loss_fn = nn.CrossEntropyLoss()
 
     with GreenTorch() as gt:
-        start_time = time.time()
+        
         for epoch in range(0, num_epochs + 1):
             total_loss = 0
             progress = tqdm.tqdm(
@@ -234,6 +234,7 @@ def train_model(
                 leave=False,
                 mininterval=0,  # Aktualisiert bei jedem Aufruf
             )
+            start_time = time.time()
             for batch_idx, (x_batch, y_batch) in enumerate(progress, start=1):
                 x_batch = x_batch.to(device)
                 y_batch = y_batch.to(device)
