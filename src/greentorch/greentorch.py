@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader, Dataset
 import requests
 from .core.devicemanager import DeviceManager
 from .core.optimizer import SimpleDirectionalOptimizer
+from .core.tools import *
 from . import optimizer
 
 
@@ -72,22 +73,24 @@ class GreenTorch(ContextDecorator):
                 self.devicemanager.gpu_devices[gpu_id]["backend"].set_gpu_max_frequency(new_frequency)
             self.last_timestamp = now
 
-    def profile(self, max_profiler_measurements: int = 20):
+    def profile(self, max_profiler_measurements: int = 5):
         self.logger.debug("Called energy profiler")
 
         current_state = {}
         for gpu_id in self.gpu_ids:
             current_state[gpu_id] = {
-                "max_frequency": self.devicemanager.gpu_devices[gpu_id]["backend"].get_gpu_max_frequency(),
+            #    "max_frequency": self.devicemanager.gpu_devices[gpu_id]["backend"].get_gpu_max_frequency(),
+                "max_frequency": 2600,
                 "key": self.key,
                 "power": self.devicemanager.get_power_value(gpu_id)
             }
-            self.devicemanager.gpu_devices[gpu_id]["backend"].set_gpu_max_frequency(current_state[gpu_id]["max_frequency"] - 50)
+            #self.devicemanager.gpu_devices[gpu_id]["backend"].set_gpu_max_frequency(current_state[gpu_id]["max_frequency"] - 50)
         self.logger.info(f"Measured: {current_state}")
         self.profiler_values.append(current_state)
 
         self.profiler_index += 1
 
         if self.profiler_index >= max_profiler_measurements:
-            print(self.profiler_values)
+            #print(self.profiler_values)
+            print_profiling(self.profiler_values)
             exit(0)
