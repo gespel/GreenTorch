@@ -234,8 +234,10 @@ def train_model(
                 leave=False,
                 mininterval=0,  # Aktualisiert bei jedem Aufruf
             )
-            start_time = time.time()
+            start_time = 0
             for batch_idx, (x_batch, y_batch) in enumerate(progress, start=1):
+                if batch_idx == 1:
+                    start_time = time.time()
                 x_batch = x_batch.to(device)
                 y_batch = y_batch.to(device)
                 
