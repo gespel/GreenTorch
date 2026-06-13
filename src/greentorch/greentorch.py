@@ -28,7 +28,7 @@ class GreenTorch(ContextDecorator):
         self.last_timestamp = 0
         self.last_timediff = 0
         self.profiler_index = 0
-        self.profiler_values = []
+        self.profiler_values = {}
 
         self.devicemanager = DeviceManager(gpu_ids=self.gpu_ids)
 
@@ -76,16 +76,20 @@ class GreenTorch(ContextDecorator):
     def profile(self, max_profiler_measurements: int = 25):
         self.logger.debug("Called energy profiler")
 
-        current_state = {}
         for gpu_id in self.gpu_ids:
-            current_state[gpu_id] = {
-                "max_frequency": self.devicemanager.gpu_devices[gpu_id]["backend"].get_gpu_max_frequency(),
-                "key": self.key,
-                "power": self.devicemanager.get_power_value(gpu_id)
-            }
-            self.devicemanager.gpu_devices[gpu_id]["backend"].set_gpu_max_frequency(current_state[gpu_id]["max_frequency"] - 50)
-        self.logger.info(f"Measured: {current_state}")
-        self.profiler_values.append(current_state)
+            if gpu_id not in self.profiler_values:
+                self.profiler_values[gpu_id] = {
+                    "max_frequency": [],
+                    "key": [],
+                    "power": []
+                }
+
+            self.profiler_values[gpu_id]["max_frequency"].append(self.devicemanager.gpu_devices[gpu_id]["backend"].get_gpu_max_frequency())
+            self.profiler_values[gpu_id]["key"].append(self.key)
+            self.profiler_values[gpu_id]["power"].append(self.devicemanager.get_power_value(gpu_id))
+
+            self.devicemanager.gpu_devices[gpu_id]["backend"].set_gpu_max_frequency(self.devicemanager.gpu_devices[gpu_id]["backend"].get_gpu_max_frequency() - 50)
+        self.logger.info(f"Measured: {self.profiler_values}")
 
         self.profiler_index += 1
 
