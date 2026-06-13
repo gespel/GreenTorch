@@ -28,14 +28,20 @@ class GreenTorch(ContextDecorator):
         self.last_timestamp = 0
         self.last_timediff = 0
         self.profiler_index = 0
+        self.profiler_sets_count = 0
         self.profiler_values = {}
+        self.profiler_all_sets = []
 
-        self.devicemanager = DeviceManager(gpu_ids=self.gpu_ids)
+        
+
+        self.devicemanager = DeviceManager(gpu_ids=self.gpu_ids, logger=self.logger)
 
         self.devicemanager.gpu_devices[gpu_ids[0]]["backend"].set_gpu_max_frequency(2600)
 
         for gpu_id in self.gpu_ids:
             self.logger.info(f"Monitoring GPU {gpu_id} with initial frequency {self.devicemanager.gpu_devices[gpu_id]['backend'].get_gpu_max_frequency()} MHz")
+
+        self.init_frequency = self.devicemanager.gpu_devices[gpu_id]['backend'].get_gpu_max_frequency()
 
         self.logger.info(f"{optimizer.sum_as_string(1, 2)}")
         self.soptimizer = SimpleDirectionalOptimizer(self.logger)
@@ -73,7 +79,7 @@ class GreenTorch(ContextDecorator):
                 self.devicemanager.gpu_devices[gpu_id]["backend"].set_gpu_max_frequency(new_frequency)
             self.last_timestamp = now
 
-    def profile(self, max_profiler_measurements: int = 25):
+    def profile(self, max_profiler_measurements: int = 25, max_profiler_measurement_sets: int = 10):
         self.logger.debug("Called energy profiler")
 
         for gpu_id in self.gpu_ids:
@@ -89,11 +95,21 @@ class GreenTorch(ContextDecorator):
             self.profiler_values[gpu_id]["power"].append(self.devicemanager.get_power_value(gpu_id))
 
             self.devicemanager.gpu_devices[gpu_id]["backend"].set_gpu_max_frequency(self.devicemanager.gpu_devices[gpu_id]["backend"].get_gpu_max_frequency() - 50)
-        self.logger.info(f"Measured: {self.profiler_values}")
+        #self.logger.info(f"Measured: {self.profiler_values}")
 
         self.profiler_index += 1
 
         if self.profiler_index >= max_profiler_measurements:
-            print(self.profiler_values)
-            print_profiling(self.profiler_values)
-            exit(0)
+            #print(self.profiler_values)
+            self.logger.info(f"Profiling epoch {self.profiler_sets_count} finished")
+            self.profiler_all_sets.append(self.profiler_values.copy())
+            self.profiler_values = {}
+
+            self.profiler_sets_count += 1
+            self.profiler_index = 0
+
+            self.devicemanager.gpu_devices[gpu_id]["backend"].set_gpu_max_frequency(self.init_frequency)
+
+            if self.profiler_sets_count >= max_profiler_measurement_sets:
+                print_profiling(self.profiler_all_sets)
+                exit(0)

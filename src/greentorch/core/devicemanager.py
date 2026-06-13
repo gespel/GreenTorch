@@ -7,7 +7,8 @@ from collections import deque
 
 
 class DeviceManager:
-    def __init__(self, gpu_ids: list):
+    def __init__(self, gpu_ids: list, logger):
+        self.logger = logger
         try:
             self._mp_ctx = multiprocessing.get_context("fork")
         except ValueError:
