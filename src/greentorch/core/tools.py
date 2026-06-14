@@ -1,5 +1,7 @@
 from matplotlib import pyplot as plt
 import statistics
+import time
+from datetime import datetime
 
 def print_profiling(profiler_all_values: list):
     for gpu in profiler_all_values[0]:
@@ -23,4 +25,6 @@ def print_profiling(profiler_all_values: list):
         plt.ylabel("Efficiency (Iterations per Second/Power Usage)")
         plt.title("Frequency Efficiency for the AMD RX 6900 XT")
         plt.grid(True)
+        filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S.pdf")
+        plt.savefig(filename)
         plt.show()
