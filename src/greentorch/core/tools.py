@@ -20,6 +20,7 @@ def print_profiling(profiler_all_values: list):
 
         plt.plot(frequencies, [keys[k] / powers[k] for k in range(0, len(keys))])
         plt.xlabel("Frequency in Mhz")
-        plt.ylabel("Key/Power Usage")
+        plt.ylabel("Efficiency (Iterations per Second/Power Usage)")
+        plt.title("Frequency Efficiency for the AMD RX 6900 XT")
         plt.grid(True)
         plt.show()
