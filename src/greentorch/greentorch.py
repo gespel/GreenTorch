@@ -80,7 +80,7 @@ class GreenTorch(ContextDecorator):
                 self.devicemanager.gpu_devices[gpu_id]["backend"].set_gpu_max_frequency(new_frequency)
             self.last_timestamp = now
 
-    def profile(self, max_profiler_measurements: int = 30, max_profiler_measurement_sets: int = 30):
+    def profile(self, max_profiler_measurements: int = 30, max_profiler_measurement_sets: int = 100):
         self.logger.debug("Called energy profiler")
 
         if self.warm_up_round:
